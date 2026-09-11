@@ -1,0 +1,13 @@
+{
+  "name": "PSX Watch",
+  "short_name": "PSX Watch",
+  "description": "Personal PSX watchlist and alert log",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0F1419",
+  "theme_color": "#0F1419",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

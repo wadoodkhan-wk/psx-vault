@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PSX Watch</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F1419">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0F1419; --panel:#161D24; --panel-2:#1C242D; --line:#26313B;
+    --text:#E8EAED; --muted:#7C8792; --faint:#4A5560;
+    --up:#4FB286; --up-dim:#2E4A3E; --down:#C1503F; --down-dim:#4A2E29;
+    --amber:#E8B24D;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:'IBM Plex Sans',sans-serif; min-height:100vh;}
+  .wrap{max-width:640px; margin:0 auto; padding:20px 16px 90px;}
+
+  header{padding:8px 0 20px; border-bottom:1px solid var(--line); margin-bottom:20px;}
+  .brand{font-family:'Newsreader',serif; font-weight:500; font-size:26px; letter-spacing:.2px;}
+  .brand em{font-style:italic; color:var(--muted);}
+  .index-row{display:flex; align-items:baseline; gap:12px; margin-top:14px; flex-wrap:wrap;}
+  .index-num{font-family:'IBM Plex Mono',monospace; font-size:38px; font-weight:600;
+    font-variant-numeric:tabular-nums;}
+  .index-chg{font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:500;}
+  .index-label{color:var(--muted); font-size:13px; margin-top:2px;}
+  .up{color:var(--up);} .down{color:var(--down);}
+
+  .section-title{font-size:13px; color:var(--muted); text-transform:none;
+    margin:28px 0 10px; display:flex; justify-content:space-between; align-items:center;}
+  .section-title button{background:none; border:1px solid var(--line); color:var(--muted);
+    font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:4px 10px;
+    border-radius:6px; cursor:pointer;}
+  .section-title button:active{background:var(--panel-2);}
+
+  .row{display:flex; align-items:center; padding:13px 4px; border-bottom:1px solid var(--line);
+    gap:10px;}
+  .row:last-child{border-bottom:none;}
+  .sym{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px; width:64px;
+    flex-shrink:0;}
+  .sym-name{color:var(--faint); font-size:11px; display:block; font-weight:400; margin-top:1px;
+    font-family:'IBM Plex Sans',sans-serif;}
+  .price-col{flex:1; text-align:right;}
+  .price{font-family:'IBM Plex Mono',monospace; font-size:16px; font-variant-numeric:tabular-nums;}
+  .chg{font-family:'IBM Plex Mono',monospace; font-size:12.5px; margin-top:2px;
+    font-variant-numeric:tabular-nums;}
+  .vol{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--faint); width:70px;
+    text-align:right; flex-shrink:0;}
+  .flag{width:6px; height:6px; border-radius:50%; flex-shrink:0;}
+  .flag.up{background:var(--up);} .flag.down{background:var(--down);} .flag.flat{background:var(--faint);}
+
+  .alert-item{padding:12px 14px; background:var(--panel); border-radius:10px; margin-bottom:8px;
+    border-left:3px solid var(--amber);}
+  .alert-top{display:flex; justify-content:space-between; font-size:12px; color:var(--muted);
+    margin-bottom:4px; font-family:'IBM Plex Mono',monospace;}
+  .alert-msg{font-size:14px; line-height:1.4;}
+  .empty{color:var(--faint); font-size:13px; padding:20px 4px; text-align:center;}
+
+  .card{background:var(--panel); border-radius:12px; padding:16px; margin-bottom:12px;}
+  .field-label{font-size:12px; color:var(--muted); margin-bottom:6px; display:block;}
+  input[type=text]{width:100%; background:var(--panel-2); border:1px solid var(--line);
+    color:var(--text); padding:10px 12px; border-radius:8px; font-family:'IBM Plex Mono',monospace;
+    font-size:13px;}
+  .btn{background:var(--up-dim); color:var(--up); border:1px solid var(--up); padding:10px 16px;
+    border-radius:8px; font-size:14px; font-weight:500; cursor:pointer; width:100%;
+    font-family:'IBM Plex Sans',sans-serif; margin-top:10px;}
+  .btn:active{opacity:.8;}
+  .hint{font-size:12px; color:var(--faint); line-height:1.5; margin-top:10px;}
+  .hint a{color:var(--amber);}
+  .status-dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px;}
+  .status-dot.live{background:var(--up);} .status-dot.off{background:var(--faint);}
+
+  .demo-badge{display:inline-block; font-size:10.5px; color:var(--amber); border:1px solid var(--amber);
+    padding:2px 8px; border-radius:20px; margin-left:8px; vertical-align:middle; font-family:'IBM Plex Sans',sans-serif;}
+  .chart-card{background:var(--panel); border-radius:12px; padding:16px 16px 10px; margin-bottom:12px;}
+  .chart-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;}
+  .chart-sym{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px;}
+  .chart-name{color:var(--faint); font-size:11px; margin-left:6px;}
+  .chart-price{font-family:'IBM Plex Mono',monospace; font-size:16px; text-align:right;}
+  .chart-chg{font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:right; margin-top:1px;}
+  .chart-svg-wrap{position:relative; width:100%; height:72px;}
+  .chart-path{fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
+    stroke-dasharray:600; stroke-dashoffset:600; animation:drawLine 1.6s ease-out forwards;}
+  .chart-fill{opacity:.12;}
+  @keyframes drawLine{to{stroke-dashoffset:0;}}
+  .live-dot{animation:pulseDot 1.8s ease-in-out infinite;}
+  @keyframes pulseDot{
+    0%{r:3.5; opacity:1;} 50%{r:6.5; opacity:.35;} 100%{r:3.5; opacity:1;}
+  }
+  .range-tabs{display:flex; gap:6px; margin:2px 0 18px; overflow-x:auto; padding-bottom:2px;
+    scrollbar-width:none; -ms-overflow-style:none;}
+  .range-tabs::-webkit-scrollbar{display:none;}
+  .range-tabs button{background:var(--panel-2); border:1px solid var(--line); color:var(--muted);
+    font-size:12px; padding:6px 12px; border-radius:20px; cursor:pointer; font-family:'IBM Plex Sans',sans-serif;
+    flex-shrink:0; white-space:nowrap;}
+  .range-tabs button.active{color:var(--text); border-color:var(--faint); background:var(--panel);}
+
+  .search-box{width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    padding:10px 12px; border-radius:8px; font-family:'IBM Plex Sans',sans-serif; font-size:14px;
+    margin-bottom:14px;}
+  .toggle{position:relative; width:38px; height:22px; flex-shrink:0;}
+  .toggle input{opacity:0; width:0; height:0;}
+  .toggle-track{position:absolute; inset:0; background:var(--faint); border-radius:20px; transition:.2s;
+    cursor:pointer;}
+  .toggle-track::before{content:""; position:absolute; width:16px; height:16px; left:3px; top:3px;
+    background:var(--text); border-radius:50%; transition:.2s;}
+  .toggle input:checked + .toggle-track{background:var(--up-dim); border:1px solid var(--up);}
+  .toggle input:checked + .toggle-track::before{transform:translateX(16px); background:var(--up);}
+  .row-new{border-left:2px solid var(--amber); padding-left:8px; margin-left:-10px;}
+
+  nav{position:fixed; bottom:0; left:0; right:0; background:var(--panel);
+    border-top:1px solid var(--line); display:flex; padding:8px 0 calc(8px + env(safe-area-inset-bottom));
+    max-width:640px; margin:0 auto;}
+  nav button{flex:1; background:none; border:none; color:var(--faint); font-size:11px;
+    display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px; cursor:pointer;
+    font-family:'IBM Plex Sans',sans-serif;}
+  nav button.active{color:var(--text);}
+  nav svg{width:20px; height:20px;}
+  .view{display:none;} .view.active{display:block;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">PSX <em>Watch</em></div>
+    <div class="index-row">
+      <div>
+        <div class="index-num" id="idxVal">—</div>
+        <div class="index-label">KSE-100</div>
+      </div>
+      <div class="index-chg" id="idxChg">connect a data source below</div>
+    </div>
+  </header>
+
+  <div id="view-watch" class="view active">
+    <div class="section-title">
+      <span><span class="status-dot off" id="liveDot"></span><span id="liveText">not connected</span></span>
+      <button id="refreshBtn">Refresh</button>
+    </div>
+    <input type="text" class="search-box" id="watchSearch" placeholder="Search companies by symbol or name...">
+    <div id="watchlist"><div class="empty">No data source configured yet — set one up in Settings.</div></div>
+  </div>
+
+  <div id="view-trends" class="view">
+    <div class="section-title">
+      <span>Trend lines<span class="demo-badge">demo data — preview</span></span>
+    </div>
+    <div class="range-tabs" id="rangeTabs">
+      <button data-range="12H">12H</button>
+      <button data-range="1D">1D</button>
+      <button data-range="15D">15D</button>
+      <button data-range="1M" class="active">1M</button>
+      <button data-range="3M">3M</button>
+      <button data-range="6M">6M</button>
+      <button data-range="1Y">1Y</button>
+      <button data-range="2Y">2Y</button>
+      <button data-range="5Y">5Y</button>
+    </div>
+    <div id="trendCharts"></div>
+  </div>
+
+  <div id="view-alerts" class="view">
+    <div class="section-title"><span>Alert log</span></div>
+    <div id="alertlist"><div class="empty">No alerts yet.</div></div>
+  </div>
+
+  <div id="view-settings" class="view">
+    <div class="section-title"><span>Data source</span></div>
+    <div class="card">
+      <span class="field-label">n8n / Sheets JSON endpoint</span>
+      <input type="text" id="dataUrl" placeholder="https://your-n8n-instance/webhook/psx-watchlist">
+      <div class="hint">Point this at the webhook or published Sheet JSON that your n8n workflow keeps updated. The app polls it every 30s while open.</div>
+      <button class="btn" id="saveUrl">Save</button>
+    </div>
+
+    <div class="section-title"><span>Notifications</span></div>
+    <div class="card">
+      <span class="field-label">ntfy.sh topic name</span>
+      <input type="text" id="ntfyTopic" placeholder="e.g. wadood-psx-alerts-x7k2">
+      <div class="hint">
+        Pick a random, hard-to-guess topic name (anyone who knows it can read your alerts — ntfy topics are public by name).<br><br>
+        1. Install the <b>ntfy</b> app on your phone (App Store / Play Store) and subscribe to this same topic name — that's what delivers notifications when this app is closed.<br>
+        2. Point your n8n workflow's alert step at <span style="font-family:'IBM Plex Mono',monospace">https://ntfy.sh/&lt;your-topic&gt;</span> via HTTP POST.<br>
+        3. This app will also show live in-app alerts when open, via the button below.
+      </div>
+      <button class="btn" id="saveTopic">Save & connect</button>
+    </div>
+  </div>
+</div>
+
+<nav>
+  <button data-view="watch" class="active">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,17 9,11 13,15 21,6"/></svg>
+    Watchlist
+  </button>
+  <button data-view="trends">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,16 8,10 12,13 16,6 21,9"/><circle cx="21" cy="9" r="1.8" fill="currentColor" stroke="none"/></svg>
+    Trends
+  </button>
+  <button data-view="alerts">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a6 6 0 0 0-6 6v4l-2 4h16l-2-4V8a6 6 0 0 0-6-6z"/><path d="M9 20a3 3 0 0 0 6 0"/></svg>
+    Alerts
+  </button>
+  <button data-view="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6a7 7 0 0 0 .1-1.2z"/></svg>
+    Settings
+  </button>
+</nav>
+
+<script>
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+
+const state = {
+  dataUrl: localStorage.getItem("psxwatch_dataurl") || "",
+  ntfyTopic: localStorage.getItem("psxwatch_ntfytopic") || "",
+  alerts: JSON.parse(localStorage.getItem("psxwatch_alerts") || "[]"),
+};
+
+document.getElementById("dataUrl").value = state.dataUrl;
+document.getElementById("ntfyTopic").value = state.ntfyTopic;
+
+// ---- nav ----
+document.querySelectorAll("nav button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("view-" + btn.dataset.view).classList.add("active");
+  });
+});
+
+// ---- settings ----
+document.getElementById("saveUrl").addEventListener("click", () => {
+  state.dataUrl = document.getElementById("dataUrl").value.trim();
+  localStorage.setItem("psxwatch_dataurl", state.dataUrl);
+  fetchData();
+});
+
+document.getElementById("saveTopic").addEventListener("click", () => {
+  state.ntfyTopic = document.getElementById("ntfyTopic").value.trim();
+  localStorage.setItem("psxwatch_ntfytopic", state.ntfyTopic);
+  if (Notification && Notification.permission !== "granted") Notification.requestPermission();
+  connectNtfy();
+});
+
+document.getElementById("refreshBtn").addEventListener("click", fetchData);
+
+// ---- data polling ----
+async function fetchData() {
+  if (!state.dataUrl) return;
+  try {
+    const res = await fetch(state.dataUrl, { cache: "no-store" });
+    const data = await res.json();
+    render(data);
+    setLive(true);
+  } catch (e) {
+    setLive(false);
+  }
+}
+
+function setLive(ok) {
+  document.getElementById("liveDot").className = "status-dot " + (ok ? "live" : "off");
+  document.getElementById("liveText").textContent = ok ? "live" : "connection failed";
+}
+
+let fullWatchlist = [];
+
+function render(data) {
+  if (data.index) {
+    document.getElementById("idxVal").textContent = Number(data.index.value).toLocaleString();
+    const chg = data.index.changePct;
+    const el = document.getElementById("idxChg");
+    el.textContent = (chg >= 0 ? "+" : "") + chg.toFixed(2) + "% today";
+    el.className = "index-chg " + (chg >= 0 ? "up" : "down");
+  }
+  fullWatchlist = data.watchlist || [];
+  renderWatchlist(document.getElementById("watchSearch").value);
+}
+
+function renderWatchlist(filterText) {
+  const list = document.getElementById("watchlist");
+  const q = (filterText || "").trim().toLowerCase();
+  const filtered = fullWatchlist.filter(s =>
+    !q || s.symbol.toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q)
+  );
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty">${fullWatchlist.length ? "No matches." : "No tickers yet."}</div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(s => {
+    const dir = s.changePct > 0 ? "up" : s.changePct < 0 ? "down" : "flat";
+    const sign = s.changePct >= 0 ? "+" : "";
+    const checked = s.notifyOn !== false ? "checked" : "";
+    return `<div class="row">
+      <span class="flag ${dir}"></span>
+      <div class="sym">${s.symbol}<span class="sym-name">${s.name || ""}</span></div>
+      <div class="price-col">
+        <div class="price">${Number(s.price).toFixed(2)}</div>
+        <div class="chg ${dir}">${sign}${s.changePct.toFixed(2)}%</div>
+      </div>
+      <label class="toggle" title="Notifications ${checked ? "on" : "off"} for ${s.symbol}">
+        <input type="checkbox" data-symbol="${s.symbol}" ${checked} onchange="onToggleNotify(event)">
+        <span class="toggle-track"></span>
+      </label>
+    </div>`;
+  }).join("");
+}
+
+document.getElementById("watchSearch").addEventListener("input", (e) => renderWatchlist(e.target.value));
+
+async function onToggleNotify(e) {
+  const symbol = e.target.dataset.symbol;
+  const enabled = e.target.checked;
+  if (!state.dataUrl) return;
+  try {
+    await fetch(state.dataUrl, {
+      method: "POST",
+      body: JSON.stringify({ action: "setNotify", symbol, enabled }),
+    });
+  } catch (err) {
+    // revert the switch visually if the save failed
+    e.target.checked = !enabled;
+  }
+}
+
+function formatVol(v){
+  if (v >= 1e6) return (v/1e6).toFixed(1)+"M";
+  if (v >= 1e3) return (v/1e3).toFixed(0)+"K";
+  return v;
+}
+
+// ---- ntfy live connection (in-app alerts while open) ----
+let ntfySource = null;
+function connectNtfy() {
+  if (ntfySource) ntfySource.close();
+  if (!state.ntfyTopic) return;
+  ntfySource = new EventSource(`https://ntfy.sh/${state.ntfyTopic}/sse`);
+  ntfySource.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.event !== "message") return;
+      addAlert(msg.title || "Alert", msg.message || "");
+      if (Notification && Notification.permission === "granted") {
+        new Notification(msg.title || "PSX Watch", { body: msg.message, icon: "icon.svg" });
+      }
+    } catch (err) {}
+  };
+}
+
+function addAlert(title, message) {
+  state.alerts.unshift({ time: new Date().toISOString(), title, message });
+  state.alerts = state.alerts.slice(0, 100);
+  localStorage.setItem("psxwatch_alerts", JSON.stringify(state.alerts));
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const el = document.getElementById("alertlist");
+  if (!state.alerts.length) { el.innerHTML = '<div class="empty">No alerts yet.</div>'; return; }
+  el.innerHTML = state.alerts.map(a => `
+    <div class="alert-item">
+      <div class="alert-top"><span>${a.title}</span><span>${new Date(a.time).toLocaleString()}</span></div>
+      <div class="alert-msg">${a.message}</div>
+    </div>`).join("");
+}
+
+// ---- trend charts (demo data until a real endpoint provides history) ----
+const DEMO_SERIES = {}; // symbol -> array of prices, seeded once
+const DEMO_WATCHLIST = [
+  { symbol: "OGDC",  name: "Oil & Gas Dev Co", base: 320 },
+  { symbol: "LUCK",  name: "Lucky Cement",     base: 980 },
+  { symbol: "HBL",   name: "Habib Bank",       base: 245 },
+  { symbol: "ENGRO", name: "Engro Corp",       base: 410 },
+  { symbol: "SYS",   name: "Systems Ltd",      base: 615 },
+];
+let currentRange = "1M";
+
+function seedSeries(base, points) {
+  const arr = [base];
+  let drift = (Math.random() - 0.45) * 0.6; // slight per-series trend bias
+  for (let i = 1; i < points; i++) {
+    const noise = (Math.random() - 0.5) * (base * 0.012);
+    const next = Math.max(base * 0.5, arr[i - 1] + noise + drift);
+    arr.push(next);
+  }
+  return arr;
+}
+
+function pointsForRange(range) {
+  return {
+    "12H": 24,  // ~30 min intervals
+    "1D":  48,  // ~10 min intervals across a trading day
+    "15D": 15,  // daily closes
+    "1M":  22,  // trading days in a month
+    "3M":  64,
+    "6M":  128,
+    "1Y":  52,  // weekly closes
+    "2Y":  104,
+    "5Y":  60,  // monthly closes
+  }[range] || 30;
+}
+
+function buildPath(series, w, h) {
+  const min = Math.min(...series), max = Math.max(...series);
+  const pad = (max - min) * 0.15 || 1;
+  const lo = min - pad, hi = max + pad;
+  const stepX = w / (series.length - 1);
+  const coords = series.map((v, i) => {
+    const x = i * stepX;
+    const y = h - ((v - lo) / (hi - lo)) * h;
+    return [x, y];
+  });
+  const line = coords.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const fill = line + ` L${w},${h} L0,${h} Z`;
+  return { line, fill, last: coords[coords.length - 1] };
+}
+
+function renderTrends() {
+  const container = document.getElementById("trendCharts");
+  const points = pointsForRange(currentRange);
+  container.innerHTML = DEMO_WATCHLIST.map(item => {
+    if (!DEMO_SERIES[item.symbol] || DEMO_SERIES[item.symbol].length !== points) {
+      DEMO_SERIES[item.symbol] = seedSeries(item.base, points);
+    }
+    const series = DEMO_SERIES[item.symbol];
+    const first = series[0], lastVal = series[series.length - 1];
+    const changePct = ((lastVal - first) / first) * 100;
+    const dir = changePct >= 0 ? "up" : "down";
+    const color = dir === "up" ? "#4FB286" : "#C1503F";
+    const w = 300, h = 72;
+    const { line, fill, last } = buildPath(series, w, h);
+    const gradId = "grad-" + item.symbol;
+
+    return `<div class="chart-card">
+      <div class="chart-head">
+        <div><span class="chart-sym">${item.symbol}</span><span class="chart-name">${item.name}</span></div>
+        <div>
+          <div class="chart-price">${lastVal.toFixed(2)}</div>
+          <div class="chart-chg ${dir}">${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="chart-svg-wrap">
+        <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%; height:100%; overflow:visible;">
+          <defs>
+            <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="${color}" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="${fill}" fill="url(#${gradId})" class="chart-fill"/>
+          <path d="${line}" class="chart-path" style="stroke:${color}"/>
+          <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${color}" class="live-dot"/>
+        </svg>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+document.getElementById("rangeTabs").addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  document.querySelectorAll("#rangeTabs button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  currentRange = btn.dataset.range;
+  renderTrends();
+});
+
+// simulate a live tick so the chart never feels static while you're looking at it
+setInterval(() => {
+  if (!document.getElementById("view-trends").classList.contains("active")) return;
+  DEMO_WATCHLIST.forEach(item => {
+    const series = DEMO_SERIES[item.symbol];
+    if (!series) return;
+    const last = series[series.length - 1];
+    const noise = (Math.random() - 0.5) * (item.base * 0.006);
+    series.push(Math.max(item.base * 0.5, last + noise));
+    series.shift();
+  });
+  renderTrends();
+}, 3500);
+
+// ---- init ----
+renderAlerts();
+renderTrends();
+if (state.dataUrl) fetchData();
+if (state.ntfyTopic) connectNtfy();
+setInterval(fetchData, 30000);
+</script>
+</body>
+</html>
