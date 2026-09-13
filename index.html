@@ -460,9 +460,13 @@ function renderCompanyDetail(d) {
   }
   document.getElementById("detailTitle").textContent = d.name ? `${d.symbol} — ${d.name}` : d.symbol;
   const dir = d.changePct >= 0 ? "up" : "down";
+  const noQuote = !d.price || d.price === 0;
+  const noQuoteBanner = noQuote
+    ? `<div class="hint" style="color:var(--amber); margin-bottom:14px;">This company currently shows no live quote in the data feed — likely suspended or not actively trading right now. The stats below reflect its last real recorded activity.</div>`
+    : "";
   const rows = [
-    ["Current price", Number(d.price).toFixed(2)],
-    ["Change today", `<span class="${dir}">${d.changePct >= 0 ? "+" : ""}${Number(d.changePct).toFixed(2)}% (${d.change >= 0 ? "+" : ""}${Number(d.change).toFixed(2)})</span>`],
+    ["Current price", noQuote ? "No live quote" : Number(d.price).toFixed(2)],
+    ["Change today", noQuote ? "—" : `<span class="${dir}">${d.changePct >= 0 ? "+" : ""}${Number(d.changePct).toFixed(2)}% (${d.change >= 0 ? "+" : ""}${Number(d.change).toFixed(2)})</span>`],
     ["Volume", d.volume ? Number(d.volume).toLocaleString() : "—"],
     ["52-week high", d.high52 ? Number(d.high52).toFixed(2) : "not available"],
     ["52-week low", d.low52 ? Number(d.low52).toFixed(2) : "not available"],
@@ -471,7 +475,7 @@ function renderCompanyDetail(d) {
     ["YTD change", fmtPct(d.ytdChangePct)],
     ["1-year change", fmtPct(d.oneYearChangePct)],
   ];
-  body.innerHTML = rows.map(([label, value]) =>
+  body.innerHTML = noQuoteBanner + rows.map(([label, value]) =>
     `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${value}</span></div>`
   ).join("") + `<div class="hint" style="margin-top:14px;">Today's Open/High/Low aren't shown — no confirmed real source for those yet. Everything above is either live or computed from your own real price history (${d.daysOfHistory} days on file).</div>`;
 }
@@ -716,26 +720,30 @@ function makeSparkline(values, color) {
 function renderWatchlist(filterText) {
   const list = document.getElementById("watchlist");
   const q = (filterText || "").trim().toLowerCase();
-  const filtered = fullWatchlist.filter(s =>
-    !q || String(s.symbol).toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q)
-  );
+  const filtered = fullWatchlist
+    .filter(s => !q || String(s.symbol).toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q))
+    .sort((a, b) => (!a.price || a.price === 0 ? 1 : 0) - (!b.price || b.price === 0 ? 1 : 0));
   if (!filtered.length) {
     list.innerHTML = `<div class="empty">${fullWatchlist.length ? "No matches." : "No tickers yet."}</div>`;
     return;
   }
   list.innerHTML = filtered.map(s => {
+    const noQuote = !s.price || s.price === 0;
     const dir = s.changePct > 0 ? "up" : s.changePct < 0 ? "down" : "flat";
     const sign = s.changePct >= 0 ? "+" : "";
     const checked = s.notifyOn !== false ? "checked" : "";
     const color = dir === "up" ? "#4CB88A" : dir === "down" ? "#D1594B" : "#4E5868";
     const spark = s.indicators ? makeSparkline(s.indicators.sparkline, color) : '<svg class="sparkline"></svg>';
+    const priceCol = noQuote
+      ? `<div class="price" style="color:var(--faint); font-size:12px;">No live quote</div>`
+      : `<div class="price">${Number(s.price).toFixed(2)}</div>
+         <div class="chg ${dir}">${sign}${s.changePct.toFixed(2)}%</div>`;
     return `<div class="row row-clickable" onclick="openCompanyDetail('${s.symbol}')">
-      <span class="flag ${dir}"></span>
+      <span class="flag ${noQuote ? "flat" : dir}"></span>
       <div class="sym">${s.symbol}<span class="sym-name">${s.name || ""}</span></div>
       ${spark}
       <div class="price-col">
-        <div class="price">${Number(s.price).toFixed(2)}</div>
-        <div class="chg ${dir}">${sign}${s.changePct.toFixed(2)}%</div>
+        ${priceCol}
       </div>
       <label class="toggle" title="Notifications ${checked ? "on" : "off"} for ${s.symbol}" onclick="event.stopPropagation()">
         <input type="checkbox" data-symbol="${s.symbol}" ${checked} onchange="onToggleNotify(event)">
