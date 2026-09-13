@@ -203,7 +203,15 @@
   </header>
 
   <div id="view-dashboard" class="view active">
-    <div class="section-title"><span>Market trend<span class="demo-badge" id="marketTrendBadge" style="display:none;">preview</span></span></div>
+    <div class="section-title"><span>Today</span></div>
+    <div class="chart-card" id="todayTrendCard">
+      <div class="chart-svg-wrap" style="height:90px;">
+        <svg id="todayTrendSvg" viewBox="0 0 300 90" preserveAspectRatio="none" style="width:100%; height:100%; overflow:visible;"></svg>
+      </div>
+      <div class="empty" id="todayTrendEmpty">Building up today's real ticks as the market moves — check back once trading starts.</div>
+    </div>
+
+    <div class="section-title"><span>Market trend (recent days)</span></div>
     <div class="chart-card" id="marketTrendCard">
       <div class="chart-svg-wrap" style="height:90px;">
         <svg id="marketTrendSvg" viewBox="0 0 300 90" preserveAspectRatio="none" style="width:100%; height:100%; overflow:visible;"></svg>
@@ -488,6 +496,7 @@ let fullWatchlist = [];
 function render(data) {
   fullWatchlist = data.watchlist || [];
   window.__lastMacroNews = data.macroNews || [];
+  window.__lastMarketToday = data.marketToday || [];
   if (data.index) {
     document.getElementById("idxVal").textContent = Number(data.index.value).toLocaleString();
     const chg = data.index.changePct;
@@ -507,6 +516,7 @@ function render(data) {
   renderWatchlist(document.getElementById("watchSearch").value);
   renderDashboard();
   renderMarketTrend();
+  renderTodayTrend(window.__lastMarketToday);
   renderTrends();
 
   if (!bgInitialized && fullWatchlist.length) {
@@ -714,19 +724,56 @@ async function fetchRealSeries(symbol, range) {
   }
 }
 
-function buildPath(series, w, h) {
+function buildSegments(series, w, h) {
   const min = Math.min(...series), max = Math.max(...series);
   const pad = (max - min) * 0.15 || 1;
   const lo = min - pad, hi = max + pad;
   const stepX = w / (series.length - 1);
-  const coords = series.map((v, i) => {
-    const x = i * stepX;
-    const y = h - ((v - lo) / (hi - lo)) * h;
-    return [x, y];
-  });
-  const line = coords.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
-  const fill = line + ` L${w},${h} L0,${h} Z`;
-  return { line, fill, last: coords[coords.length - 1] };
+  const coords = series.map((v, i) => [i * stepX, h - ((v - lo) / (hi - lo)) * h]);
+  const segments = [];
+  for (let i = 1; i < coords.length; i++) {
+    const up = series[i] >= series[i - 1];
+    segments.push({
+      x1: coords[i - 1][0].toFixed(1), y1: coords[i - 1][1].toFixed(1),
+      x2: coords[i][0].toFixed(1), y2: coords[i][1].toFixed(1),
+      color: up ? "#4CB88A" : "#D1594B",
+    });
+  }
+  const fillLine = coords.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const fill = fillLine + ` L${w},${h} L0,${h} Z`;
+  return { segments, fill, last: coords[coords.length - 1], overallUp: series[series.length - 1] >= series[0] };
+}
+
+function segmentsToSvg(segments) {
+  return segments.map(s => `<line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="${s.color}" stroke-width="2" stroke-linecap="round"/>`).join("");
+}
+
+function renderTodayTrend(marketToday) {
+  const svg = document.getElementById("todayTrendSvg");
+  const empty = document.getElementById("todayTrendEmpty");
+  const points = (marketToday || []).map(p => p.avgChangePct);
+
+  if (points.length < 2) {
+    svg.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+
+  const w = 300, h = 90;
+  const { segments, fill, last, overallUp } = buildSegments(points, w, h);
+  const fillColor = overallUp ? "#4CB88A" : "#D1594B";
+  const latest = points[points.length - 1];
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="todayGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${fillColor}" stop-opacity="0.25"/>
+        <stop offset="100%" stop-color="${fillColor}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="${fill}" fill="url(#todayGrad)"/>
+    ${segmentsToSvg(segments)}
+    <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${segments.length ? segments[segments.length - 1].color : fillColor}" class="live-dot"/>`;
 }
 
 function renderMarketTrend() {
@@ -761,19 +808,18 @@ function renderMarketTrend() {
   }
 
   const w = 300, h = 90;
-  const dir = avgSeries[avgSeries.length - 1] >= avgSeries[0] ? "up" : "down";
-  const color = dir === "up" ? "#4CB88A" : "#D1594B";
-  const { line, fill, last } = buildPath(avgSeries, w, h);
+  const { segments, fill, last, overallUp } = buildSegments(avgSeries, w, h);
+  const fillColor = overallUp ? "#4CB88A" : "#D1594B";
   svg.innerHTML = `
     <defs>
       <linearGradient id="marketGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
-        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        <stop offset="0%" stop-color="${fillColor}" stop-opacity="0.25"/>
+        <stop offset="100%" stop-color="${fillColor}" stop-opacity="0"/>
       </linearGradient>
     </defs>
     <path d="${fill}" fill="url(#marketGrad)"/>
-    <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${color}" class="live-dot"/>`;
+    ${segmentsToSvg(segments)}
+    <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${segments.length ? segments[segments.length - 1].color : fillColor}" class="live-dot"/>`;
 }
 
 async function renderTrends() {
@@ -812,20 +858,19 @@ async function renderTrends() {
       continue;
     }
     if (loadingEl) loadingEl.remove();
-    const dir = series[series.length - 1] >= series[0] ? "up" : "down";
-    const color = dir === "up" ? "#4CB88A" : "#D1594B";
-    const { line, fill, last } = buildPath(series, 300, 72);
+    const { segments, fill, last, overallUp } = buildSegments(series, 300, 72);
+    const fillColor = overallUp ? "#4CB88A" : "#D1594B";
     const svg = document.getElementById("svg-" + s.symbol);
     if (!svg) continue;
     const gradId = "grad-" + s.symbol;
     svg.innerHTML = `
       <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
-        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        <stop offset="0%" stop-color="${fillColor}" stop-opacity="0.25"/>
+        <stop offset="100%" stop-color="${fillColor}" stop-opacity="0"/>
       </linearGradient></defs>
       <path d="${fill}" fill="url(#${gradId})"/>
-      <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${color}" class="live-dot"/>`;
+      ${segmentsToSvg(segments)}
+      <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${segments.length ? segments[segments.length - 1].color : fillColor}" class="live-dot"/>`;
   }
 }
 
