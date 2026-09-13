@@ -805,16 +805,13 @@ function renderMarketTrend() {
   const withSparklines = fullWatchlist.filter(s => s.indicators && s.indicators.sparkline && s.indicators.sparkline.length >= 5);
   const svg = document.getElementById("marketTrendSvg");
   const empty = document.getElementById("marketTrendEmpty");
-  const badge = document.getElementById("marketTrendBadge");
 
   if (!withSparklines.length) {
     svg.innerHTML = "";
     empty.style.display = "block";
-    badge.style.display = "none";
     return;
   }
   empty.style.display = "none";
-  badge.style.display = "none"; // this is real, aggregated data — no "preview" label needed
 
   // Normalize each company's series to % change from its own first point, then
   // average across all companies at each index — an honest, real aggregate of
