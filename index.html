@@ -594,7 +594,7 @@ function renderWatchlist(filterText) {
   const list = document.getElementById("watchlist");
   const q = (filterText || "").trim().toLowerCase();
   const filtered = fullWatchlist.filter(s =>
-    !q || s.symbol.toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q)
+    !q || String(s.symbol).toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q)
   );
   if (!filtered.length) {
     list.innerHTML = `<div class="empty">${fullWatchlist.length ? "No matches." : "No tickers yet."}</div>`;
@@ -784,7 +784,7 @@ async function renderTrends() {
   }
   const q = chartsSearchText.trim().toLowerCase();
   const list = q
-    ? fullWatchlist.filter(s => s.symbol.toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q)).slice(0, 10)
+    ? fullWatchlist.filter(s => String(s.symbol).toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q)).slice(0, 10)
     : [...fullWatchlist].sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct)).slice(0, 6);
 
   if (!list.length) {
