@@ -97,7 +97,8 @@
   .chart-name{color:var(--faint); font-size:11px; margin-left:6px;}
   .chart-price{font-family:'IBM Plex Mono',monospace; font-size:16px; text-align:right;}
   .chart-chg{font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:right; margin-top:1px;}
-  .chart-svg-wrap{position:relative; width:100%; height:72px;}
+  .chart-svg-wrap{position:relative; width:100%; height:72px; touch-action:pan-y;}
+  .chart-svg-wrap svg{touch-action:pan-y;}
   .chart-path{fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
     stroke-dasharray:600; stroke-dashoffset:600; animation:drawLine 1.6s ease-out forwards;}
   .chart-fill{opacity:.12;}
@@ -149,6 +150,14 @@
   .chart-switch{background:var(--panel-2); border:1px solid var(--line); color:var(--muted);
     font-size:11px; padding:5px 10px; border-radius:16px; cursor:pointer; font-family:'IBM Plex Sans',sans-serif;}
   .chart-switch.active{color:var(--text); border-color:var(--faint); background:var(--panel);}
+
+  .chart-tooltip{position:absolute; top:4px; background:var(--panel-2); border:1px solid var(--line);
+    border-radius:6px; padding:6px 9px; font-size:11px; pointer-events:none; z-index:5; display:none;
+    white-space:nowrap; box-shadow:0 4px 14px rgba(0,0,0,.35);}
+  .tt-date{color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:10px;}
+  .tt-value{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px; margin-top:1px;}
+  .tt-change{font-family:'IBM Plex Mono',monospace; font-size:10.5px; margin-top:1px;}
+  .tt-change.up{color:var(--up);} .tt-change.down{color:var(--down);}
 
   .detail-row{display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line);
     font-size:13px;}
@@ -225,17 +234,17 @@
     <div class="section-title">
       <span>Market chart</span>
       <div style="display:flex; gap:6px;">
-        <button class="chart-switch active" data-chart="today">Today</button>
-        <button class="chart-switch" data-chart="trend">Last 30 days</button>
+        <button class="chart-switch" data-chart="today">Today</button>
+        <button class="chart-switch active" data-chart="trend">Last 30 days</button>
       </div>
     </div>
-    <div class="chart-card" id="todayTrendCard">
+    <div class="chart-card" id="todayTrendCard" style="display:none;">
       <div class="chart-svg-wrap" style="height:90px;">
         <svg id="todayTrendSvg" viewBox="0 0 300 90" preserveAspectRatio="none" style="width:100%; height:100%; overflow:visible;"></svg>
       </div>
       <div class="empty" id="todayTrendEmpty">Building up today's real ticks as the market moves — check back once trading starts.</div>
     </div>
-    <div class="chart-card" id="marketTrendCard" style="display:none;">
+    <div class="chart-card" id="marketTrendCard">
       <div class="chart-svg-wrap" style="height:90px;">
         <svg id="marketTrendSvg" viewBox="0 0 300 90" preserveAspectRatio="none" style="width:100%; height:100%; overflow:visible;"></svg>
       </div>
@@ -830,48 +839,127 @@ function pointsForRange(range) {
 async function fetchRealSeries(symbol, range) {
   const key = symbol + "_" + range;
   if (seriesCache[key]) return seriesCache[key];
-  if (!state.dataUrl) return [];
+  if (!state.dataUrl) return { prices: [], dates: [] };
   const sep = state.dataUrl.includes("?") ? "&" : "?";
   const url = state.dataUrl + sep + "series=" + encodeURIComponent(symbol);
   try {
     const data = await fetchJSONP(url);
-    const prices = (data.series || []).map(p => p.price).filter(p => p > 0);
+    const points = (data.series || []).filter(p => p.price > 0);
     const n = pointsForRange(range);
-    const sliced = prices.slice(-n);
-    seriesCache[key] = sliced;
-    return sliced;
+    const sliced = points.slice(-n);
+    const result = { prices: sliced.map(p => p.price), dates: sliced.map(p => p.date.substring(5)) };
+    seriesCache[key] = result;
+    return result;
   } catch (e) {
-    return [];
+    return { prices: [], dates: [] };
   }
 }
 
-function buildSegments(series, w, h) {
+function buildBaseline(series, w, h, idSuffix) {
   const min = Math.min(...series), max = Math.max(...series);
   const pad = (max - min) * 0.15 || 1;
   const lo = min - pad, hi = max + pad;
   const stepX = w / (series.length - 1);
-  const coords = series.map((v, i) => [i * stepX, h - ((v - lo) / (hi - lo)) * h]);
-  const segments = [];
-  for (let i = 1; i < coords.length; i++) {
-    const up = series[i] >= series[i - 1];
-    segments.push({
-      x1: coords[i - 1][0].toFixed(1), y1: coords[i - 1][1].toFixed(1),
-      x2: coords[i][0].toFixed(1), y2: coords[i][1].toFixed(1),
-      color: up ? "#4CB88A" : "#D1594B",
-    });
-  }
-  const fillLine = coords.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
-  const fill = fillLine + ` L${w},${h} L0,${h} Z`;
-  return { segments, fill, last: coords[coords.length - 1], overallUp: series[series.length - 1] >= series[0] };
+  const scaleY = v => h - ((v - lo) / (hi - lo)) * h;
+  const coords = series.map((v, i) => [i * stepX, scaleY(v)]);
+  const baseY = scaleY(series[0]);
+  const line = coords.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const areaPath = line + ` L${w},${baseY.toFixed(1)} L0,${baseY.toFixed(1)} Z`;
+  const last = coords[coords.length - 1];
+  const up = series[series.length - 1] >= series[0];
+  const color = up ? "#4CB88A" : "#D1594B";
+  const clipAbove = "clipAbove" + idSuffix, clipBelow = "clipBelow" + idSuffix;
+  const svg = `
+    <defs>
+      <clipPath id="${clipAbove}"><rect x="0" y="0" width="${w}" height="${baseY.toFixed(1)}"/></clipPath>
+      <clipPath id="${clipBelow}"><rect x="0" y="${baseY.toFixed(1)}" width="${w}" height="${(h - baseY).toFixed(1)}"/></clipPath>
+    </defs>
+    <path d="${areaPath}" fill="#4CB88A" opacity="0.22" clip-path="url(#${clipAbove})"/>
+    <path d="${areaPath}" fill="#D1594B" opacity="0.22" clip-path="url(#${clipBelow})"/>
+    <line x1="0" y1="${baseY.toFixed(1)}" x2="${w}" y2="${baseY.toFixed(1)}" stroke="currentColor" stroke-opacity="0.3" stroke-width="1" stroke-dasharray="3,3"/>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.5" fill="${color}" class="live-dot"/>`;
+  return { svg, up, coords, w, h };
 }
 
-function segmentsToSvg(segments) {
-  return segments.map(s => `<line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="${s.color}" stroke-width="2" stroke-linecap="round"/>`).join("");
+// ---- interactive hover/touch tooltip, shared by every baseline chart ----
+function attachChartTooltip(svgEl, wrapEl, coords, labels, values, w, isPercentSeries) {
+  let tooltip = wrapEl.querySelector(".chart-tooltip");
+  if (!tooltip) {
+    tooltip = document.createElement("div");
+    tooltip.className = "chart-tooltip";
+    wrapEl.appendChild(tooltip);
+  }
+  const ns = "http://www.w3.org/2000/svg";
+  let guideLine = svgEl.querySelector(".chart-guide");
+  if (!guideLine) {
+    guideLine = document.createElementNS(ns, "line");
+    guideLine.setAttribute("class", "chart-guide");
+    guideLine.setAttribute("stroke", "currentColor");
+    guideLine.setAttribute("stroke-opacity", "0.4");
+    guideLine.setAttribute("stroke-width", "1");
+    svgEl.appendChild(guideLine);
+  }
+  let guideDot = svgEl.querySelector(".chart-guide-dot");
+  if (!guideDot) {
+    guideDot = document.createElementNS(ns, "circle");
+    guideDot.setAttribute("class", "chart-guide-dot");
+    guideDot.setAttribute("r", "4");
+    svgEl.appendChild(guideDot);
+  }
+  guideLine.setAttribute("y1", "0");
+  guideLine.setAttribute("y2", String(coords[0] ? svgEl.viewBox.baseVal.height : 90));
+  guideLine.style.display = "none";
+  guideDot.style.display = "none";
+  tooltip.style.display = "none";
+
+  function showAt(clientX) {
+    const rect = svgEl.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    let idx = Math.round(ratio * (coords.length - 1));
+    idx = Math.max(0, Math.min(coords.length - 1, idx));
+    const [x, y] = coords[idx];
+    guideLine.setAttribute("x1", x.toFixed(1));
+    guideLine.setAttribute("x2", x.toFixed(1));
+    guideLine.style.display = "block";
+    guideDot.setAttribute("cx", x.toFixed(1));
+    guideDot.setAttribute("cy", y.toFixed(1));
+    const dir = values[idx] >= values[0] ? "up" : "down";
+    guideDot.setAttribute("fill", dir === "up" ? "#4CB88A" : "#D1594B");
+    guideDot.style.display = "block";
+
+    const label = labels[idx] || "";
+    const val = values[idx];
+    let valueText, changeHtml = "";
+    if (isPercentSeries) {
+      valueText = (val >= 0 ? "+" : "") + Number(val).toFixed(2) + "%";
+    } else {
+      valueText = Number(val).toFixed(2);
+      const chg = values[0] ? ((val - values[0]) / values[0]) * 100 : 0;
+      changeHtml = `<div class="tt-change ${chg >= 0 ? "up" : "down"}">${chg >= 0 ? "+" : ""}${chg.toFixed(2)}% since start</div>`;
+    }
+    tooltip.innerHTML = `<div class="tt-date">${label}</div><div class="tt-value">${valueText}</div>${changeHtml}`;
+    tooltip.style.display = "block";
+    const wrapRect = wrapEl.getBoundingClientRect();
+    let leftPx = (x / w) * wrapRect.width;
+    leftPx = Math.max(4, Math.min(wrapRect.width - 110, leftPx));
+    tooltip.style.left = leftPx + "px";
+  }
+  function hide() {
+    guideLine.style.display = "none";
+    guideDot.style.display = "none";
+    tooltip.style.display = "none";
+  }
+  svgEl.onpointermove = (e) => showAt(e.clientX);
+  svgEl.onpointerleave = hide;
+  svgEl.ontouchmove = (e) => { if (e.touches[0]) showAt(e.touches[0].clientX); };
+  svgEl.ontouchend = hide;
 }
 
 function renderTodayTrend(marketToday) {
   const svg = document.getElementById("todayTrendSvg");
   const empty = document.getElementById("todayTrendEmpty");
+  const times = (marketToday || []).map(p => p.time);
   const points = (marketToday || []).map(p => p.avgChangePct);
 
   if (points.length < 2) {
@@ -882,19 +970,9 @@ function renderTodayTrend(marketToday) {
   empty.style.display = "none";
 
   const w = 300, h = 90;
-  const { segments, fill, last, overallUp } = buildSegments(points, w, h);
-  const fillColor = overallUp ? "#4CB88A" : "#D1594B";
-  const latest = points[points.length - 1];
-  svg.innerHTML = `
-    <defs>
-      <linearGradient id="todayGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${fillColor}" stop-opacity="0.25"/>
-        <stop offset="100%" stop-color="${fillColor}" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    <path d="${fill}" fill="url(#todayGrad)"/>
-    ${segmentsToSvg(segments)}
-    <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${segments.length ? segments[segments.length - 1].color : fillColor}" class="live-dot"/>`;
+  const { svg: chartSvg, coords } = buildBaseline(points, w, h, "Today");
+  svg.innerHTML = chartSvg;
+  attachChartTooltip(svg, document.getElementById("todayTrendCard").querySelector(".chart-svg-wrap"), coords, times, points, w, true);
 }
 
 function renderMarketTrend() {
@@ -924,20 +1002,15 @@ function renderMarketTrend() {
     });
     avgSeries.push(count ? sum / count : 0);
   }
+  // Real calendar dates for these points — taken from whichever tracked company
+  // has a matching-length window, since all real trading-day sequences align.
+  const dateSource = withSparklines.find(s => s.indicators.sparklineDates && s.indicators.sparklineDates.length >= len);
+  const dates = dateSource ? dateSource.indicators.sparklineDates.slice(-len).map(d => d.substring(5)) : avgSeries.map(() => "");
 
   const w = 300, h = 90;
-  const { segments, fill, last, overallUp } = buildSegments(avgSeries, w, h);
-  const fillColor = overallUp ? "#4CB88A" : "#D1594B";
-  svg.innerHTML = `
-    <defs>
-      <linearGradient id="marketGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${fillColor}" stop-opacity="0.25"/>
-        <stop offset="100%" stop-color="${fillColor}" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    <path d="${fill}" fill="url(#marketGrad)"/>
-    ${segmentsToSvg(segments)}
-    <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${segments.length ? segments[segments.length - 1].color : fillColor}" class="live-dot"/>`;
+  const { svg: chartSvg, coords } = buildBaseline(avgSeries, w, h, "Market");
+  svg.innerHTML = chartSvg;
+  attachChartTooltip(svg, document.getElementById("marketTrendCard").querySelector(".chart-svg-wrap"), coords, dates, avgSeries, w, true);
 }
 
 let trendsRendering = false;
@@ -981,26 +1054,18 @@ async function renderTrendsInner_() {
   </div>`).join("");
 
   for (const s of list) {
-    const series = await fetchRealSeries(s.symbol, currentRange);
+    const { prices, dates } = await fetchRealSeries(s.symbol, currentRange);
     const loadingEl = document.getElementById("loading-" + s.symbol);
-    if (!series.length) {
+    if (!prices.length) {
       if (loadingEl) loadingEl.textContent = "No history available yet for this company.";
       continue;
     }
     if (loadingEl) loadingEl.remove();
-    const { segments, fill, last, overallUp } = buildSegments(series, 300, 72);
-    const fillColor = overallUp ? "#4CB88A" : "#D1594B";
     const svg = document.getElementById("svg-" + s.symbol);
     if (!svg) continue;
-    const gradId = "grad-" + s.symbol;
-    svg.innerHTML = `
-      <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${fillColor}" stop-opacity="0.25"/>
-        <stop offset="100%" stop-color="${fillColor}" stop-opacity="0"/>
-      </linearGradient></defs>
-      <path d="${fill}" fill="url(#${gradId})"/>
-      ${segmentsToSvg(segments)}
-      <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${segments.length ? segments[segments.length - 1].color : fillColor}" class="live-dot"/>`;
+    const { svg: chartSvg, coords } = buildBaseline(prices, 300, 72, s.symbol);
+    svg.innerHTML = chartSvg;
+    attachChartTooltip(svg, svg.closest(".chart-svg-wrap"), coords, dates, prices, 300, false);
   }
 }
 
