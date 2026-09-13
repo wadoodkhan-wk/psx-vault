@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>PSX Watch</title>
+<title>WW PSX Vault</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0F1419">
 <link rel="icon" href="icon.svg">
@@ -12,10 +12,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0F1419; --panel:#161D24; --panel-2:#1C242D; --line:#26313B;
-    --text:#E8EAED; --muted:#7C8792; --faint:#4A5560;
-    --up:#4FB286; --up-dim:#2E4A3E; --down:#C1503F; --down-dim:#4A2E29;
-    --amber:#E8B24D;
+    --bg:#0D1117; --panel:#151B23; --panel-2:#1B222C; --line:#242C38;
+    --text:#EDEFF2; --muted:#8791A0; --faint:#4E5868;
+    --up:#4CB88A; --up-dim:#22392E; --down:#D1594B; --down-dim:#3D2521;
+    --amber:#E8B44E;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0; padding:0; background:var(--bg); color:var(--text);
@@ -23,8 +23,14 @@
   .wrap{max-width:640px; margin:0 auto; padding:20px 16px 90px;}
 
   header{padding:8px 0 20px; border-bottom:1px solid var(--line); margin-bottom:20px;}
+  .header-top{display:flex; align-items:center; justify-content:space-between;}
   .brand{font-family:'Newsreader',serif; font-weight:500; font-size:26px; letter-spacing:.2px;}
   .brand em{font-style:italic; color:var(--muted);}
+  .icon-btn{background:var(--panel); border:1px solid var(--line); color:var(--muted);
+    width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; flex-shrink:0;}
+  .icon-btn svg{width:18px; height:18px;}
+  .icon-btn:active{background:var(--panel-2);}
   .index-row{display:flex; align-items:baseline; gap:12px; margin-top:14px; flex-wrap:wrap;}
   .index-num{font-family:'IBM Plex Mono',monospace; font-size:38px; font-weight:600;
     font-variant-numeric:tabular-nums;}
@@ -114,6 +120,25 @@
   .toggle input:checked + .toggle-track::before{transform:translateX(16px); background:var(--up);}
   .row-new{border-left:2px solid var(--amber); padding-left:8px; margin-left:-10px;}
 
+  .sparkline{width:56px; height:26px; flex-shrink:0;}
+
+  .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;}
+  .stat-card{background:var(--panel); border-radius:12px; padding:14px; box-shadow:0 1px 0 rgba(255,255,255,.02) inset;}
+  .stat-card .stat-label{font-size:11px; color:var(--muted); margin-bottom:6px;}
+  .stat-card .stat-value{font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:600;}
+
+  .mover-row{display:flex; align-items:center; justify-content:space-between; padding:10px 4px;
+    border-bottom:1px solid var(--line);}
+  .mover-row:last-child{border-bottom:none;}
+  .mover-sym{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:14px;}
+  .mover-chg{font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500;}
+
+  .news-item{background:var(--panel); border-radius:10px; padding:12px 14px; margin-bottom:8px;}
+  .news-item a{color:var(--text); text-decoration:none; font-size:13.5px; line-height:1.4; display:block;}
+  .news-item a:active{opacity:.7;}
+  .news-meta{font-size:11px; color:var(--faint); margin-top:5px; font-family:'IBM Plex Mono',monospace;}
+  .indicator-line{font-size:12px; color:var(--muted); margin-top:2px;}
+
   nav{position:fixed; bottom:0; left:0; right:0; background:var(--panel);
     border-top:1px solid var(--line); display:flex; padding:8px 0 calc(8px + env(safe-area-inset-bottom));
     max-width:640px; margin:0 auto;}
@@ -123,37 +148,100 @@
   nav button.active{color:var(--text);}
   nav svg{width:20px; height:20px;}
   .view{display:none;} .view.active{display:block;}
+
+  .bg-layer{position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none;}
+  .wrap{position:relative; z-index:1;}
+  nav{z-index:2;}
+
+  .ghost-num{position:absolute; bottom:-20px; font-family:'IBM Plex Mono',monospace; font-size:12px;
+    opacity:0; white-space:nowrap; animation:ghostFloat linear forwards;}
+  @keyframes ghostFloat{
+    0%{opacity:0; transform:translateY(0);}
+    15%{opacity:.35;} 85%{opacity:.35;}
+    100%{opacity:0; transform:translateY(-70vh);}
+  }
+
+  .ticker-col{position:absolute; top:0; font-family:'IBM Plex Mono',monospace; font-size:11px;
+    color:var(--muted); opacity:.22; text-align:center; line-height:2.4; animation:tickUp linear infinite;}
+  @keyframes tickUp{from{transform:translateY(0);} to{transform:translateY(-50%);}}
+
+  .drawer-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.55); opacity:0; pointer-events:none;
+    transition:opacity .25s ease; z-index:60;}
+  .drawer-backdrop.open{opacity:1; pointer-events:auto;}
+  .drawer{position:fixed; top:0; right:0; height:100%; width:88%; max-width:380px; background:var(--panel);
+    transform:translateX(100%); transition:transform .28s cubic-bezier(.4,0,.2,1); z-index:61;
+    overflow-y:auto; padding:20px 16px calc(20px + env(safe-area-inset-bottom));
+    box-shadow:-12px 0 32px rgba(0,0,0,.4);}
+  .drawer.open{transform:translateX(0);}
+  .drawer-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;}
+  .drawer-title{font-family:'Newsreader',serif; font-size:20px; font-weight:500;}
+
+  .toast{position:fixed; top:16px; left:50%; transform:translateX(-50%) translateY(-24px); z-index:100;
+    background:var(--panel); border:1px solid var(--up); color:var(--up); padding:10px 20px;
+    border-radius:10px; font-size:13px; font-weight:500; opacity:0; pointer-events:none;
+    transition:all .3s ease; box-shadow:0 8px 24px rgba(0,0,0,.3);}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 </style>
 </head>
 <body>
+<div id="bgLayer" class="bg-layer"></div>
 <div class="wrap">
   <header>
-    <div class="brand">PSX <em>Watch</em></div>
+    <div class="header-top">
+      <div class="brand">WW <em>PSX Vault</em></div>
+      <button id="settingsBtn" class="icon-btn" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6a7 7 0 0 0 .1-1.2z"/></svg>
+      </button>
+    </div>
     <div class="index-row">
       <div>
         <div class="index-num" id="idxVal">—</div>
-        <div class="index-label">KSE-100</div>
+        <div class="index-label">Market avg (tracked companies)</div>
       </div>
-      <div class="index-chg" id="idxChg">connect a data source below</div>
+      <div class="index-chg" id="idxChg"></div>
     </div>
   </header>
 
-  <div id="view-watch" class="view active">
+  <div id="view-dashboard" class="view active">
+    <div class="section-title"><span>Market trend<span class="demo-badge" id="marketTrendBadge" style="display:none;">preview</span></span></div>
+    <div class="chart-card" id="marketTrendCard">
+      <div class="chart-svg-wrap" style="height:90px;">
+        <svg id="marketTrendSvg" viewBox="0 0 300 90" preserveAspectRatio="none" style="width:100%; height:100%; overflow:visible;"></svg>
+      </div>
+      <div class="empty" id="marketTrendEmpty">No data yet.</div>
+    </div>
+
+    <div class="section-title"><span>Today's movers</span></div>
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="section-title"><span>Top gainers</span></div>
+    <div id="topGainers"><div class="empty">No data yet.</div></div>
+
+    <div class="section-title"><span>Top losers</span></div>
+    <div id="topLosers"><div class="empty">No data yet.</div></div>
+
+    <div class="section-title"><span>Global & markets</span></div>
+    <div id="macroNewsFeed"><div class="empty">Run the macro news fetch in your Sheet to populate this.</div></div>
+
+    <div class="section-title"><span>What's new</span></div>
+    <div id="newsFeed"><div class="empty">Run the news fetch in your Sheet to populate this.</div></div>
+  </div>
+
+  <div id="view-watch" class="view">
     <div class="section-title">
       <span><span class="status-dot off" id="liveDot"></span><span id="liveText">not connected</span></span>
       <button id="refreshBtn">Refresh</button>
     </div>
     <input type="text" class="search-box" id="watchSearch" placeholder="Search companies by symbol or name...">
-    <div id="watchlist"><div class="empty">No data source configured yet — set one up in Settings.</div></div>
+    <div id="watchlist"><div class="empty">No data yet — open Settings (top right) to connect a data source.</div></div>
   </div>
 
   <div id="view-trends" class="view">
-    <div class="section-title">
-      <span>Trend lines<span class="demo-badge">demo data — preview</span></span>
-    </div>
+    <div class="section-title"><span>Charts</span></div>
+    <input type="text" class="search-box" id="chartsSearch" placeholder="Search a company, or leave blank for top movers...">
     <div class="range-tabs" id="rangeTabs">
-      <button data-range="12H">12H</button>
-      <button data-range="1D">1D</button>
+      <button data-range="12H">12H*</button>
+      <button data-range="1D">1D*</button>
       <button data-range="15D">15D</button>
       <button data-range="1M" class="active">1M</button>
       <button data-range="3M">3M</button>
@@ -162,6 +250,7 @@
       <button data-range="2Y">2Y</button>
       <button data-range="5Y">5Y</button>
     </div>
+    <div class="hint" style="margin:-10px 0 14px;">*Intraday data isn't available — 12H/1D show the most recent daily closes instead.</div>
     <div id="trendCharts"></div>
   </div>
 
@@ -169,47 +258,67 @@
     <div class="section-title"><span>Alert log</span></div>
     <div id="alertlist"><div class="empty">No alerts yet.</div></div>
   </div>
+</div>
 
-  <div id="view-settings" class="view">
-    <div class="section-title"><span>Data source</span></div>
-    <div class="card">
-      <span class="field-label">n8n / Sheets JSON endpoint</span>
-      <input type="text" id="dataUrl" placeholder="https://your-n8n-instance/webhook/psx-watchlist">
-      <div class="hint">Point this at the webhook or published Sheet JSON that your n8n workflow keeps updated. The app polls it every 30s while open.</div>
-      <button class="btn" id="saveUrl">Save</button>
-    </div>
+<div id="drawerBackdrop" class="drawer-backdrop"></div>
+<div id="settingsDrawer" class="drawer">
+  <div class="drawer-header">
+    <span class="drawer-title">Settings</span>
+    <button id="closeDrawerBtn" class="icon-btn" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
 
-    <div class="section-title"><span>Notifications</span></div>
-    <div class="card">
-      <span class="field-label">ntfy.sh topic name</span>
-      <input type="text" id="ntfyTopic" placeholder="e.g. wadood-psx-alerts-x7k2">
-      <div class="hint">
-        Pick a random, hard-to-guess topic name (anyone who knows it can read your alerts — ntfy topics are public by name).<br><br>
-        1. Install the <b>ntfy</b> app on your phone (App Store / Play Store) and subscribe to this same topic name — that's what delivers notifications when this app is closed.<br>
-        2. Point your n8n workflow's alert step at <span style="font-family:'IBM Plex Mono',monospace">https://ntfy.sh/&lt;your-topic&gt;</span> via HTTP POST.<br>
-        3. This app will also show live in-app alerts when open, via the button below.
-      </div>
-      <button class="btn" id="saveTopic">Save & connect</button>
+  <div class="section-title"><span>Data source</span></div>
+  <div class="card">
+    <span class="field-label">n8n / Sheets JSON endpoint</span>
+    <input type="text" id="dataUrl" placeholder="https://your-n8n-instance/webhook/psx-watchlist">
+    <div class="hint">Point this at the webhook or published Sheet JSON that your n8n workflow keeps updated. The app polls it every 30s while open. <span id="noDataHint" style="color:var(--amber); display:none;">Connect a data source below to get started.</span></div>
+    <button class="btn" id="saveUrl">Save</button>
+  </div>
+
+  <div class="section-title"><span>Notifications</span></div>
+  <div class="card">
+    <span class="field-label">ntfy.sh topic name</span>
+    <input type="text" id="ntfyTopic" placeholder="e.g. wadood-psx-alerts-x7k2">
+    <div class="hint">
+      Pick a random, hard-to-guess topic name (anyone who knows it can read your alerts — ntfy topics are public by name).<br><br>
+      1. Install the <b>ntfy</b> app on your phone (App Store / Play Store) and subscribe to this same topic name — that's what delivers notifications when this app is closed.<br>
+      2. Point your n8n workflow's alert step at <span style="font-family:'IBM Plex Mono',monospace">https://ntfy.sh/&lt;your-topic&gt;</span> via HTTP POST.<br>
+      3. This app will also show live in-app alerts when open, via the button below.
     </div>
+    <button class="btn" id="saveTopic">Save & connect</button>
+  </div>
+
+  <div class="section-title"><span>Appearance</span></div>
+  <div class="card">
+    <span class="field-label">Background animation</span>
+    <select id="bgStyleSelect" style="width:100%; background:var(--panel-2); border:1px solid var(--line);
+      color:var(--text); padding:10px 12px; border-radius:8px; font-family:'IBM Plex Sans',sans-serif; font-size:14px;">
+      <option value="none">None</option>
+      <option value="ghost">Floating percentages (real data)</option>
+      <option value="ticker">Vertical ticker scroll (real data)</option>
+    </select>
+    <div class="hint">Both use your actual live prices — nothing here is simulated.</div>
   </div>
 </div>
 
 <nav>
-  <button data-view="watch" class="active">
+  <button data-view="dashboard" class="active">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+    Summary
+  </button>
+  <button data-view="watch">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,17 9,11 13,15 21,6"/></svg>
-    Watchlist
+    Market
   </button>
   <button data-view="trends">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,16 8,10 12,13 16,6 21,9"/><circle cx="21" cy="9" r="1.8" fill="currentColor" stroke="none"/></svg>
-    Trends
+    Charts
   </button>
   <button data-view="alerts">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a6 6 0 0 0-6 6v4l-2 4h16l-2-4V8a6 6 0 0 0-6-6z"/><path d="M9 20a3 3 0 0 0 6 0"/></svg>
-    Alerts
-  </button>
-  <button data-view="settings">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6a7 7 0 0 0 .1-1.2z"/></svg>
-    Settings
+    Notifications
   </button>
 </nav>
 
@@ -220,10 +329,19 @@ const state = {
   dataUrl: localStorage.getItem("psxwatch_dataurl") || "",
   ntfyTopic: localStorage.getItem("psxwatch_ntfytopic") || "",
   alerts: JSON.parse(localStorage.getItem("psxwatch_alerts") || "[]"),
+  bgStyle: localStorage.getItem("psxwatch_bgstyle") || "ghost",
 };
 
 document.getElementById("dataUrl").value = state.dataUrl;
 document.getElementById("ntfyTopic").value = state.ntfyTopic;
+document.getElementById("bgStyleSelect").value = state.bgStyle;
+
+document.getElementById("bgStyleSelect").addEventListener("change", (e) => {
+  state.bgStyle = e.target.value;
+  localStorage.setItem("psxwatch_bgstyle", state.bgStyle);
+  applyBackgroundAnim();
+  showToast("Background updated");
+});
 
 // ---- nav ----
 document.querySelectorAll("nav button").forEach(btn => {
@@ -235,10 +353,35 @@ document.querySelectorAll("nav button").forEach(btn => {
   });
 });
 
+// ---- settings drawer ----
+const drawer = document.getElementById("settingsDrawer");
+const backdrop = document.getElementById("drawerBackdrop");
+function openDrawer() { drawer.classList.add("open"); backdrop.classList.add("open"); }
+function closeDrawer() { drawer.classList.remove("open"); backdrop.classList.remove("open"); }
+document.getElementById("settingsBtn").addEventListener("click", openDrawer);
+document.getElementById("closeDrawerBtn").addEventListener("click", closeDrawer);
+backdrop.addEventListener("click", closeDrawer);
+
+// ---- toast ----
+function showToast(msg) {
+  let t = document.getElementById("toast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "toast";
+    t.className = "toast";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
 // ---- settings ----
 document.getElementById("saveUrl").addEventListener("click", () => {
   state.dataUrl = document.getElementById("dataUrl").value.trim();
   localStorage.setItem("psxwatch_dataurl", state.dataUrl);
+  showToast("Data source saved");
   fetchData();
 });
 
@@ -247,6 +390,7 @@ document.getElementById("saveTopic").addEventListener("click", () => {
   localStorage.setItem("psxwatch_ntfytopic", state.ntfyTopic);
   if (Notification && Notification.permission !== "granted") Notification.requestPermission();
   connectNtfy();
+  showToast("Notifications connected");
 });
 
 document.getElementById("refreshBtn").addEventListener("click", fetchData);
@@ -289,18 +433,161 @@ function setLive(ok) {
   document.getElementById("liveText").textContent = ok ? "live" : "connection failed";
 }
 
+// ---- background animation (real data only, no simulated numbers) ----
+let bgInterval = null;
+
+function applyBackgroundAnim() {
+  const layer = document.getElementById("bgLayer");
+  clearInterval(bgInterval);
+  layer.innerHTML = "";
+  if (state.bgStyle === "ghost") startGhostAnim(layer);
+  else if (state.bgStyle === "ticker") startTickerAnim(layer);
+}
+
+function startGhostAnim(layer) {
+  bgInterval = setInterval(() => {
+    if (!fullWatchlist.length) return;
+    const s = fullWatchlist[Math.floor(Math.random() * fullWatchlist.length)];
+    if (s.changePct === 0) return; // skip flat/no-data entries, nothing real to show
+    const el = document.createElement("div");
+    el.className = "ghost-num";
+    const sign = s.changePct >= 0 ? "+" : "";
+    el.textContent = `${s.symbol} ${sign}${s.changePct.toFixed(2)}%`;
+    el.style.color = s.changePct >= 0 ? "var(--up)" : "var(--down)";
+    el.style.left = (5 + Math.random() * 85) + "%";
+    const dur = 7 + Math.random() * 4;
+    el.style.animationDuration = dur + "s";
+    layer.appendChild(el);
+    setTimeout(() => el.remove(), dur * 1000 + 200);
+  }, 850);
+}
+
+function startTickerAnim(layer) {
+  if (!fullWatchlist.length) return;
+  const withPrice = fullWatchlist.filter(s => s.price > 0);
+  if (!withPrice.length) return;
+  const colCount = 4;
+  for (let c = 0; c < colCount; c++) {
+    const col = document.createElement("div");
+    col.className = "ticker-col";
+    col.style.left = (c * 90 + 10) + "px";
+    col.style.animationDuration = (18 + c * 3) + "s";
+    const lines = [];
+    for (let i = 0; i < 24; i++) {
+      const s = withPrice[(i + c * 7) % withPrice.length];
+      lines.push(`${s.symbol} ${Number(s.price).toFixed(2)}`);
+    }
+    col.innerHTML = lines.join("<br>");
+    layer.appendChild(col);
+  }
+}
+
+let bgInitialized = false;
 let fullWatchlist = [];
 
 function render(data) {
+  fullWatchlist = data.watchlist || [];
+  window.__lastMacroNews = data.macroNews || [];
   if (data.index) {
     document.getElementById("idxVal").textContent = Number(data.index.value).toLocaleString();
     const chg = data.index.changePct;
     const el = document.getElementById("idxChg");
     el.textContent = (chg >= 0 ? "+" : "") + chg.toFixed(2) + "% today";
     el.className = "index-chg " + (chg >= 0 ? "up" : "down");
+  } else if (fullWatchlist.length) {
+    // No official index feed available yet — show an honest average of what's
+    // actually tracked instead of a fabricated index number.
+    const avgChg = fullWatchlist.reduce((sum, s) => sum + (s.changePct || 0), 0) / fullWatchlist.length;
+    document.getElementById("idxVal").textContent = (avgChg >= 0 ? "+" : "") + avgChg.toFixed(2) + "%";
+    const el = document.getElementById("idxChg");
+    el.textContent = `across ${fullWatchlist.length} companies`;
+    el.className = "index-chg " + (avgChg >= 0 ? "up" : "down");
   }
-  fullWatchlist = data.watchlist || [];
+  document.getElementById("noDataHint").style.display = fullWatchlist.length ? "none" : "inline";
   renderWatchlist(document.getElementById("watchSearch").value);
+  renderDashboard();
+  renderMarketTrend();
+  renderTrends();
+
+  if (!bgInitialized && fullWatchlist.length) {
+    applyBackgroundAnim();
+    bgInitialized = true;
+  } else if (state.bgStyle === "ticker" && fullWatchlist.length) {
+    // ticker shows a snapshot of prices — refresh it periodically so it doesn't go stale
+    applyBackgroundAnim();
+  }
+}
+
+function renderDashboard() {
+  if (!fullWatchlist.length) return;
+
+  const sorted = [...fullWatchlist].sort((a, b) => b.changePct - a.changePct);
+  const gainers = sorted.filter(s => s.changePct > 0).slice(0, 5);
+  const losers = sorted.filter(s => s.changePct < 0).slice(-5).reverse();
+  const advancing = fullWatchlist.filter(s => s.changePct > 0).length;
+  const declining = fullWatchlist.filter(s => s.changePct < 0).length;
+
+  document.getElementById("statGrid").innerHTML = `
+    <div class="stat-card"><div class="stat-label">Advancing</div><div class="stat-value up">${advancing}</div></div>
+    <div class="stat-card"><div class="stat-label">Declining</div><div class="stat-value down">${declining}</div></div>`;
+
+  const moverRow = (s, dir) => `<div class="mover-row">
+    <div>
+      <span class="mover-sym">${s.symbol}</span>
+      ${s.indicators && s.indicators.rsi14 != null ? `<div class="indicator-line">RSI14: ${s.indicators.rsi14}</div>` : ""}
+    </div>
+    <span class="mover-chg ${dir}">${dir === "up" ? "+" : ""}${s.changePct.toFixed(2)}%</span>
+  </div>`;
+
+  document.getElementById("topGainers").innerHTML = gainers.length
+    ? gainers.map(s => moverRow(s, "up")).join("")
+    : '<div class="empty">No gainers right now.</div>';
+
+  document.getElementById("topLosers").innerHTML = losers.length
+    ? losers.map(s => moverRow(s, "down")).join("")
+    : '<div class="empty">No losers right now.</div>';
+
+  const macroFeed = document.getElementById("macroNewsFeed");
+  const macroNews = window.__lastMacroNews || [];
+  if (macroNews.length) {
+    const sorted = [...macroNews].sort((a, b) => new Date(b.date) - new Date(a.date));
+    macroFeed.innerHTML = sorted.slice(0, 8).map(n => `
+      <div class="news-item">
+        <a href="${n.link}" target="_blank" rel="noopener">${n.title}</a>
+        <div class="news-meta">${n.date ? new Date(n.date).toLocaleDateString() : ""}</div>
+      </div>`).join("");
+  } else {
+    macroFeed.innerHTML = '<div class="empty">Run the macro news fetch in your Sheet to populate this.</div>';
+  }
+
+  const allNews = [];
+  fullWatchlist.forEach(s => {
+    (s.news || []).forEach(n => allNews.push({ ...n, symbol: s.symbol }));
+  });
+  allNews.sort((a, b) => new Date(b.date) - new Date(a.date));
+  const newsFeed = document.getElementById("newsFeed");
+  if (allNews.length) {
+    newsFeed.innerHTML = allNews.slice(0, 8).map(n => `
+      <div class="news-item">
+        <a href="${n.link}" target="_blank" rel="noopener">${n.title}</a>
+        <div class="news-meta">${n.symbol} · ${n.date ? new Date(n.date).toLocaleDateString() : ""}</div>
+      </div>`).join("");
+  } else {
+    newsFeed.innerHTML = '<div class="empty">Run the news fetch in your Sheet to populate this.</div>';
+  }
+}
+
+function makeSparkline(values, color) {
+  if (!values || values.length < 2) return '<svg class="sparkline"></svg>';
+  const w = 56, h = 26;
+  const min = Math.min(...values), max = Math.max(...values);
+  const pad = (max - min) * 0.1 || 1;
+  const lo = min - pad, hi = max + pad;
+  const stepX = w / (values.length - 1);
+  const pts = values.map((v, i) => `${(i * stepX).toFixed(1)},${(h - ((v - lo) / (hi - lo)) * h).toFixed(1)}`).join(" ");
+  return `<svg class="sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
 }
 
 function renderWatchlist(filterText) {
@@ -317,9 +604,12 @@ function renderWatchlist(filterText) {
     const dir = s.changePct > 0 ? "up" : s.changePct < 0 ? "down" : "flat";
     const sign = s.changePct >= 0 ? "+" : "";
     const checked = s.notifyOn !== false ? "checked" : "";
+    const color = dir === "up" ? "#4CB88A" : dir === "down" ? "#D1594B" : "#4E5868";
+    const spark = s.indicators ? makeSparkline(s.indicators.sparkline, color) : '<svg class="sparkline"></svg>';
     return `<div class="row">
       <span class="flag ${dir}"></span>
       <div class="sym">${s.symbol}<span class="sym-name">${s.name || ""}</span></div>
+      ${spark}
       <div class="price-col">
         <div class="price">${Number(s.price).toFixed(2)}</div>
         <div class="chg ${dir}">${sign}${s.changePct.toFixed(2)}%</div>
@@ -391,40 +681,37 @@ function renderAlerts() {
     </div>`).join("");
 }
 
-// ---- trend charts (demo data until a real endpoint provides history) ----
-const DEMO_SERIES = {}; // symbol -> array of prices, seeded once
-const DEMO_WATCHLIST = [
-  { symbol: "OGDC",  name: "Oil & Gas Dev Co", base: 320 },
-  { symbol: "LUCK",  name: "Lucky Cement",     base: 980 },
-  { symbol: "HBL",   name: "Habib Bank",       base: 245 },
-  { symbol: "ENGRO", name: "Engro Corp",       base: 410 },
-  { symbol: "SYS",   name: "Systems Ltd",      base: 615 },
-];
+// ---- trend charts (real data, fetched per company on demand) ----
+const seriesCache = {}; // "SYMBOL_RANGE" -> array of real prices
 let currentRange = "1M";
-
-function seedSeries(base, points) {
-  const arr = [base];
-  let drift = (Math.random() - 0.45) * 0.6; // slight per-series trend bias
-  for (let i = 1; i < points; i++) {
-    const noise = (Math.random() - 0.5) * (base * 0.012);
-    const next = Math.max(base * 0.5, arr[i - 1] + noise + drift);
-    arr.push(next);
-  }
-  return arr;
-}
+let chartsSearchText = "";
 
 function pointsForRange(range) {
+  // Daily-close-based ranges only — PSX doesn't expose intraday data we can
+  // reach, so 12H/1D fall back to the shortest real range we have (15D) with
+  // a note, rather than faking intraday granularity.
   return {
-    "12H": 24,  // ~30 min intervals
-    "1D":  48,  // ~10 min intervals across a trading day
-    "15D": 15,  // daily closes
-    "1M":  22,  // trading days in a month
-    "3M":  64,
-    "6M":  128,
-    "1Y":  52,  // weekly closes
-    "2Y":  104,
-    "5Y":  60,  // monthly closes
-  }[range] || 30;
+    "12H": 15, "1D": 15,
+    "15D": 15, "1M": 22, "3M": 64, "6M": 128, "1Y": 252, "2Y": 500, "5Y": 500,
+  }[range] || 22;
+}
+
+async function fetchRealSeries(symbol, range) {
+  const key = symbol + "_" + range;
+  if (seriesCache[key]) return seriesCache[key];
+  if (!state.dataUrl) return [];
+  const sep = state.dataUrl.includes("?") ? "&" : "?";
+  const url = state.dataUrl + sep + "series=" + encodeURIComponent(symbol);
+  try {
+    const data = await fetchJSONP(url);
+    const prices = (data.series || []).map(p => p.price).filter(p => p > 0);
+    const n = pointsForRange(range);
+    const sliced = prices.slice(-n);
+    seriesCache[key] = sliced;
+    return sliced;
+  } catch (e) {
+    return [];
+  }
 }
 
 function buildPath(series, w, h) {
@@ -442,46 +729,110 @@ function buildPath(series, w, h) {
   return { line, fill, last: coords[coords.length - 1] };
 }
 
-function renderTrends() {
-  const container = document.getElementById("trendCharts");
-  const points = pointsForRange(currentRange);
-  container.innerHTML = DEMO_WATCHLIST.map(item => {
-    if (!DEMO_SERIES[item.symbol] || DEMO_SERIES[item.symbol].length !== points) {
-      DEMO_SERIES[item.symbol] = seedSeries(item.base, points);
-    }
-    const series = DEMO_SERIES[item.symbol];
-    const first = series[0], lastVal = series[series.length - 1];
-    const changePct = ((lastVal - first) / first) * 100;
-    const dir = changePct >= 0 ? "up" : "down";
-    const color = dir === "up" ? "#4FB286" : "#C1503F";
-    const w = 300, h = 72;
-    const { line, fill, last } = buildPath(series, w, h);
-    const gradId = "grad-" + item.symbol;
+function renderMarketTrend() {
+  const withSparklines = fullWatchlist.filter(s => s.indicators && s.indicators.sparkline && s.indicators.sparkline.length >= 5);
+  const svg = document.getElementById("marketTrendSvg");
+  const empty = document.getElementById("marketTrendEmpty");
+  const badge = document.getElementById("marketTrendBadge");
 
-    return `<div class="chart-card">
-      <div class="chart-head">
-        <div><span class="chart-sym">${item.symbol}</span><span class="chart-name">${item.name}</span></div>
-        <div>
-          <div class="chart-price">${lastVal.toFixed(2)}</div>
-          <div class="chart-chg ${dir}">${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%</div>
-        </div>
-      </div>
-      <div class="chart-svg-wrap">
-        <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%; height:100%; overflow:visible;">
-          <defs>
-            <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="${color}" stop-opacity="0.35"/>
-              <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <path d="${fill}" fill="url(#${gradId})" class="chart-fill"/>
-          <path d="${line}" class="chart-path" style="stroke:${color}"/>
-          <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${color}" class="live-dot"/>
-        </svg>
-      </div>
-    </div>`;
-  }).join("");
+  if (!withSparklines.length) {
+    svg.innerHTML = "";
+    empty.style.display = "block";
+    badge.style.display = "none";
+    return;
+  }
+  empty.style.display = "none";
+  badge.style.display = "none"; // this is real, aggregated data — no "preview" label needed
+
+  // Normalize each company's series to % change from its own first point, then
+  // average across all companies at each index — an honest, real aggregate of
+  // your tracked companies (not an official index, since PSX doesn't expose
+  // one we can reach — labeled as "Market avg" throughout the app for clarity).
+  const len = Math.min(...withSparklines.map(s => s.indicators.sparkline.length));
+  const avgSeries = [];
+  for (let i = 0; i < len; i++) {
+    let sum = 0, count = 0;
+    withSparklines.forEach(s => {
+      const series = s.indicators.sparkline.slice(-len);
+      const base = series[0];
+      if (base) { sum += ((series[i] - base) / base) * 100; count++; }
+    });
+    avgSeries.push(count ? sum / count : 0);
+  }
+
+  const w = 300, h = 90;
+  const dir = avgSeries[avgSeries.length - 1] >= avgSeries[0] ? "up" : "down";
+  const color = dir === "up" ? "#4CB88A" : "#D1594B";
+  const { line, fill, last } = buildPath(avgSeries, w, h);
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="marketGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="${fill}" fill="url(#marketGrad)"/>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${color}" class="live-dot"/>`;
 }
+
+async function renderTrends() {
+  const container = document.getElementById("trendCharts");
+  if (!fullWatchlist.length) {
+    container.innerHTML = '<div class="empty">No data yet — connect a data source in Settings.</div>';
+    return;
+  }
+  const q = chartsSearchText.trim().toLowerCase();
+  const list = q
+    ? fullWatchlist.filter(s => s.symbol.toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q)).slice(0, 10)
+    : [...fullWatchlist].sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct)).slice(0, 6);
+
+  if (!list.length) {
+    container.innerHTML = '<div class="empty">No matches.</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(s => `<div class="chart-card" id="chart-${s.symbol}">
+    <div class="chart-head">
+      <div><span class="chart-sym">${s.symbol}</span><span class="chart-name">${s.name || ""}</span></div>
+      <div>
+        <div class="chart-price">${Number(s.price).toFixed(2)}</div>
+        <div class="chart-chg ${s.changePct >= 0 ? "up" : "down"}">${s.changePct >= 0 ? "+" : ""}${s.changePct.toFixed(2)}%</div>
+      </div>
+    </div>
+    <div class="chart-svg-wrap"><svg viewBox="0 0 300 72" preserveAspectRatio="none" style="width:100%; height:100%;" id="svg-${s.symbol}"></svg></div>
+    <div class="empty" id="loading-${s.symbol}" style="padding:8px 0; text-align:left;">Loading real history...</div>
+  </div>`).join("");
+
+  for (const s of list) {
+    const series = await fetchRealSeries(s.symbol, currentRange);
+    const loadingEl = document.getElementById("loading-" + s.symbol);
+    if (!series.length) {
+      if (loadingEl) loadingEl.textContent = "No history available yet for this company.";
+      continue;
+    }
+    if (loadingEl) loadingEl.remove();
+    const dir = series[series.length - 1] >= series[0] ? "up" : "down";
+    const color = dir === "up" ? "#4CB88A" : "#D1594B";
+    const { line, fill, last } = buildPath(series, 300, 72);
+    const svg = document.getElementById("svg-" + s.symbol);
+    if (!svg) continue;
+    const gradId = "grad-" + s.symbol;
+    svg.innerHTML = `
+      <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient></defs>
+      <path d="${fill}" fill="url(#${gradId})"/>
+      <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${color}" class="live-dot"/>`;
+  }
+}
+
+document.getElementById("chartsSearch").addEventListener("input", (e) => {
+  chartsSearchText = e.target.value;
+  renderTrends();
+});
 
 document.getElementById("rangeTabs").addEventListener("click", (e) => {
   const btn = e.target.closest("button");
@@ -492,23 +843,8 @@ document.getElementById("rangeTabs").addEventListener("click", (e) => {
   renderTrends();
 });
 
-// simulate a live tick so the chart never feels static while you're looking at it
-setInterval(() => {
-  if (!document.getElementById("view-trends").classList.contains("active")) return;
-  DEMO_WATCHLIST.forEach(item => {
-    const series = DEMO_SERIES[item.symbol];
-    if (!series) return;
-    const last = series[series.length - 1];
-    const noise = (Math.random() - 0.5) * (item.base * 0.006);
-    series.push(Math.max(item.base * 0.5, last + noise));
-    series.shift();
-  });
-  renderTrends();
-}, 3500);
-
 // ---- init ----
 renderAlerts();
-renderTrends();
 if (state.dataUrl) fetchData();
 if (state.ntfyTopic) connectNtfy();
 setInterval(fetchData, 30000);
