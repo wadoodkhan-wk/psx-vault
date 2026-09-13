@@ -146,6 +146,18 @@
   .news-meta{font-size:11px; color:var(--faint); margin-top:5px; font-family:'IBM Plex Mono',monospace;}
   .indicator-line{font-size:12px; color:var(--muted); margin-top:2px;}
 
+  .chart-switch{background:var(--panel-2); border:1px solid var(--line); color:var(--muted);
+    font-size:11px; padding:5px 10px; border-radius:16px; cursor:pointer; font-family:'IBM Plex Sans',sans-serif;}
+  .chart-switch.active{color:var(--text); border-color:var(--faint); background:var(--panel);}
+
+  .detail-row{display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line);
+    font-size:13px;}
+  .detail-row:last-child{border-bottom:none;}
+  .detail-label{color:var(--muted);}
+  .detail-value{font-family:'IBM Plex Mono',monospace; font-weight:500;}
+  .row-clickable{cursor:pointer;}
+  .row-clickable:active{background:var(--panel-2);}
+
   nav{position:fixed; bottom:0; left:0; right:0; background:var(--panel);
     border-top:1px solid var(--line); display:flex; padding:8px 0 calc(8px + env(safe-area-inset-bottom));
     max-width:640px; margin:0 auto;}
@@ -210,16 +222,20 @@
   </header>
 
   <div id="view-dashboard" class="view active">
-    <div class="section-title"><span>Today</span></div>
+    <div class="section-title">
+      <span>Market chart</span>
+      <div style="display:flex; gap:6px;">
+        <button class="chart-switch active" data-chart="today">Today</button>
+        <button class="chart-switch" data-chart="trend">Last 30 days</button>
+      </div>
+    </div>
     <div class="chart-card" id="todayTrendCard">
       <div class="chart-svg-wrap" style="height:90px;">
         <svg id="todayTrendSvg" viewBox="0 0 300 90" preserveAspectRatio="none" style="width:100%; height:100%; overflow:visible;"></svg>
       </div>
       <div class="empty" id="todayTrendEmpty">Building up today's real ticks as the market moves — check back once trading starts.</div>
     </div>
-
-    <div class="section-title"><span>Market trend (recent days)</span></div>
-    <div class="chart-card" id="marketTrendCard">
+    <div class="chart-card" id="marketTrendCard" style="display:none;">
       <div class="chart-svg-wrap" style="height:90px;">
         <svg id="marketTrendSvg" viewBox="0 0 300 90" preserveAspectRatio="none" style="width:100%; height:100%; overflow:visible;"></svg>
       </div>
@@ -326,6 +342,17 @@
   </div>
 </div>
 
+<div id="detailBackdrop" class="drawer-backdrop"></div>
+<div id="detailDrawer" class="drawer">
+  <div class="drawer-header">
+    <span class="drawer-title" id="detailTitle">—</span>
+    <button id="closeDetailBtn" class="icon-btn" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div id="detailBody"><div class="empty">Loading...</div></div>
+</div>
+
 <nav>
   <button data-view="dashboard" class="active">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
@@ -386,7 +413,67 @@ document.querySelectorAll("nav button").forEach(btn => {
   });
 });
 
-// ---- settings drawer ----
+// ---- chart switch (Today / Last 30 days) ----
+document.querySelectorAll(".chart-switch").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".chart-switch").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const showToday = btn.dataset.chart === "today";
+    document.getElementById("todayTrendCard").style.display = showToday ? "block" : "none";
+    document.getElementById("marketTrendCard").style.display = showToday ? "none" : "block";
+  });
+});
+
+// ---- company detail drawer ----
+const detailDrawer = document.getElementById("detailDrawer");
+const detailBackdrop = document.getElementById("detailBackdrop");
+function openDetailDrawer() { detailDrawer.classList.add("open"); detailBackdrop.classList.add("open"); }
+function closeDetailDrawer() { detailDrawer.classList.remove("open"); detailBackdrop.classList.remove("open"); }
+document.getElementById("closeDetailBtn").addEventListener("click", closeDetailDrawer);
+detailBackdrop.addEventListener("click", closeDetailDrawer);
+
+async function openCompanyDetail(symbol) {
+  document.getElementById("detailTitle").textContent = symbol;
+  document.getElementById("detailBody").innerHTML = '<div class="empty">Loading real stats...</div>';
+  openDetailDrawer();
+  if (!state.dataUrl) return;
+  const sep = state.dataUrl.includes("?") ? "&" : "?";
+  try {
+    const d = await fetchJSONP(state.dataUrl + sep + "detail=" + encodeURIComponent(symbol));
+    renderCompanyDetail(d);
+  } catch (e) {
+    document.getElementById("detailBody").innerHTML = '<div class="empty">Could not load details right now.</div>';
+  }
+}
+
+function fmtPct(v) {
+  if (v === null || v === undefined) return "not enough history yet";
+  return (v >= 0 ? "+" : "") + Number(v).toFixed(2) + "%";
+}
+
+function renderCompanyDetail(d) {
+  const body = document.getElementById("detailBody");
+  if (!d.found) {
+    body.innerHTML = '<div class="empty">No data found for this company.</div>';
+    return;
+  }
+  document.getElementById("detailTitle").textContent = d.name ? `${d.symbol} — ${d.name}` : d.symbol;
+  const dir = d.changePct >= 0 ? "up" : "down";
+  const rows = [
+    ["Current price", Number(d.price).toFixed(2)],
+    ["Change today", `<span class="${dir}">${d.changePct >= 0 ? "+" : ""}${Number(d.changePct).toFixed(2)}% (${d.change >= 0 ? "+" : ""}${Number(d.change).toFixed(2)})</span>`],
+    ["Volume", d.volume ? Number(d.volume).toLocaleString() : "—"],
+    ["52-week high", d.high52 ? Number(d.high52).toFixed(2) : "not available"],
+    ["52-week low", d.low52 ? Number(d.low52).toFixed(2) : "not available"],
+    ["30-day high", d.thirtyDayHigh != null ? Number(d.thirtyDayHigh).toFixed(2) : "not enough history yet"],
+    ["30-day low", d.thirtyDayLow != null ? Number(d.thirtyDayLow).toFixed(2) : "not enough history yet"],
+    ["YTD change", fmtPct(d.ytdChangePct)],
+    ["1-year change", fmtPct(d.oneYearChangePct)],
+  ];
+  body.innerHTML = rows.map(([label, value]) =>
+    `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${value}</span></div>`
+  ).join("") + `<div class="hint" style="margin-top:14px;">Today's Open/High/Low aren't shown — no confirmed real source for those yet. Everything above is either live or computed from your own real price history (${d.daysOfHistory} days on file).</div>`;
+}
 const drawer = document.getElementById("settingsDrawer");
 const backdrop = document.getElementById("drawerBackdrop");
 function openDrawer() { drawer.classList.add("open"); backdrop.classList.add("open"); }
@@ -641,7 +728,7 @@ function renderWatchlist(filterText) {
     const checked = s.notifyOn !== false ? "checked" : "";
     const color = dir === "up" ? "#4CB88A" : dir === "down" ? "#D1594B" : "#4E5868";
     const spark = s.indicators ? makeSparkline(s.indicators.sparkline, color) : '<svg class="sparkline"></svg>';
-    return `<div class="row">
+    return `<div class="row row-clickable" onclick="openCompanyDetail('${s.symbol}')">
       <span class="flag ${dir}"></span>
       <div class="sym">${s.symbol}<span class="sym-name">${s.name || ""}</span></div>
       ${spark}
@@ -649,7 +736,7 @@ function renderWatchlist(filterText) {
         <div class="price">${Number(s.price).toFixed(2)}</div>
         <div class="chg ${dir}">${sign}${s.changePct.toFixed(2)}%</div>
       </div>
-      <label class="toggle" title="Notifications ${checked ? "on" : "off"} for ${s.symbol}">
+      <label class="toggle" title="Notifications ${checked ? "on" : "off"} for ${s.symbol}" onclick="event.stopPropagation()">
         <input type="checkbox" data-symbol="${s.symbol}" ${checked} onchange="onToggleNotify(event)">
         <span class="toggle-track"></span>
       </label>
