@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>WW PSX Vault</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0F1419">
+<meta name="theme-color" content="#0D1117">
+<script>document.documentElement.setAttribute("data-theme", localStorage.getItem("psxwatch_theme") || "dark");</script>
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,6 +17,12 @@
     --text:#EDEFF2; --muted:#8791A0; --faint:#4E5868;
     --up:#4CB88A; --up-dim:#22392E; --down:#D1594B; --down-dim:#3D2521;
     --amber:#E8B44E;
+  }
+  :root[data-theme="light"]{
+    --bg:#F7F8FA; --panel:#FFFFFF; --panel-2:#F0F2F5; --line:#DDE1E6;
+    --text:#1A1F26; --muted:#5B6472; --faint:#8B93A0;
+    --up:#1F8A5F; --up-dim:#DCF3E8; --down:#B5392D; --down-dim:#FBE4E1;
+    --amber:#A5700D;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0; padding:0; background:var(--bg); color:var(--text);
@@ -300,6 +307,14 @@
 
   <div class="section-title"><span>Appearance</span></div>
   <div class="card">
+    <span class="field-label">Theme</span>
+    <select id="themeSelect" style="width:100%; background:var(--panel-2); border:1px solid var(--line);
+      color:var(--text); padding:10px 12px; border-radius:8px; font-family:'IBM Plex Sans',sans-serif; font-size:14px;
+      margin-bottom:14px;">
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+    </select>
+
     <span class="field-label">Background animation</span>
     <select id="bgStyleSelect" style="width:100%; background:var(--panel-2); border:1px solid var(--line);
       color:var(--text); padding:10px 12px; border-radius:8px; font-family:'IBM Plex Sans',sans-serif; font-size:14px;">
@@ -338,11 +353,21 @@ const state = {
   ntfyTopic: localStorage.getItem("psxwatch_ntfytopic") || "",
   alerts: JSON.parse(localStorage.getItem("psxwatch_alerts") || "[]"),
   bgStyle: localStorage.getItem("psxwatch_bgstyle") || "ghost",
+  theme: localStorage.getItem("psxwatch_theme") || "dark",
 };
+document.documentElement.setAttribute("data-theme", state.theme);
 
 document.getElementById("dataUrl").value = state.dataUrl;
 document.getElementById("ntfyTopic").value = state.ntfyTopic;
 document.getElementById("bgStyleSelect").value = state.bgStyle;
+document.getElementById("themeSelect").value = state.theme;
+
+document.getElementById("themeSelect").addEventListener("change", (e) => {
+  state.theme = e.target.value;
+  localStorage.setItem("psxwatch_theme", state.theme);
+  document.documentElement.setAttribute("data-theme", state.theme);
+  showToast("Theme updated");
+});
 
 document.getElementById("bgStyleSelect").addEventListener("change", (e) => {
   state.bgStyle = e.target.value;
