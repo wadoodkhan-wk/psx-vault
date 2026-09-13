@@ -410,6 +410,7 @@ document.querySelectorAll("nav button").forEach(btn => {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById("view-" + btn.dataset.view).classList.add("active");
+    if (btn.dataset.view === "trends") renderTrends();
   });
 });
 
@@ -629,7 +630,7 @@ function render(data) {
   renderDashboard();
   renderMarketTrend();
   renderTodayTrend(window.__lastMarketToday);
-  renderTrends();
+  if (document.getElementById("view-trends").classList.contains("active")) renderTrends();
 
   if (!bgInitialized && fullWatchlist.length) {
     applyBackgroundAnim();
@@ -931,7 +932,19 @@ function renderMarketTrend() {
     <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${segments.length ? segments[segments.length - 1].color : fillColor}" class="live-dot"/>`;
 }
 
+let trendsRendering = false;
+
 async function renderTrends() {
+  if (trendsRendering) return; // don't stack another batch on top of one still in flight
+  trendsRendering = true;
+  try {
+    await renderTrendsInner_();
+  } finally {
+    trendsRendering = false;
+  }
+}
+
+async function renderTrendsInner_() {
   const container = document.getElementById("trendCharts");
   if (!fullWatchlist.length) {
     container.innerHTML = '<div class="empty">No data yet — connect a data source in Settings.</div>';
