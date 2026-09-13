@@ -1,4 +1,4 @@
-const CACHE = "psx-watch-v2"; // bumped to force this fix to take effect immediately
+const CACHE = "psx-watch-v3"; // bumped again to force this fix
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (e) => {
@@ -15,11 +15,16 @@ self.addEventListener("activate", (e) => {
   self.clients.claim();
 });
 
-// Network-first: always try to fetch the latest version when online, and only
-// fall back to the cached copy if the network request fails (e.g. offline).
-// This is what was missing before — the old version always served whatever
-// was cached first, even after you updated the files on GitHub.
+// Network-first for OUR OWN files only. Cross-origin requests (like the JSONP
+// call to your Apps Script URL) must be left completely alone — intercepting
+// them here re-triggers the same CORS problem we already fixed, since a
+// service worker's own fetch() is subject to CORS even when a plain <script>
+// tag load wouldn't be.
 self.addEventListener("fetch", (e) => {
+  const url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) {
+    return; // let the browser handle this one natively, untouched
+  }
   e.respondWith(
     fetch(e.request)
       .then((res) => {
