@@ -449,7 +449,7 @@ async function openCompanyDetail(symbol) {
   if (!state.dataUrl) return;
   const sep = state.dataUrl.includes("?") ? "&" : "?";
   try {
-    const d = await fetchJSONP(state.dataUrl + sep + "detail=" + encodeURIComponent(symbol));
+    const d = await fetchJSON(state.dataUrl + sep + "detail=" + encodeURIComponent(symbol));
     renderCompanyDetail(d);
   } catch (e) {
     document.getElementById("detailBody").innerHTML = '<div class="empty">Could not load details right now.</div>';
@@ -551,10 +551,24 @@ function fetchJSONP(url) {
   });
 }
 
+// Modern, standards-based fetch — works reliably across all browsers including
+// iOS Safari/Chrome (which share Apple's WebKit engine and are stricter about
+// the older JSONP <script>-tag technique). JSONP is kept only as a fallback
+// for the rare case fetch itself is blocked (e.g. a restrictive network).
+async function fetchJSON(url) {
+  try {
+    const res = await fetch(url, { method: "GET", mode: "cors" });
+    if (!res.ok) throw new Error("bad status " + res.status);
+    return await res.json();
+  } catch (e) {
+    return fetchJSONP(url);
+  }
+}
+
 async function fetchData() {
   if (!state.dataUrl) return;
   try {
-    const data = await fetchJSONP(state.dataUrl);
+    const data = await fetchJSON(state.dataUrl);
     render(data);
     setLive(true);
   } catch (e) {
@@ -843,7 +857,7 @@ async function fetchRealSeries(symbol, range) {
   const sep = state.dataUrl.includes("?") ? "&" : "?";
   const url = state.dataUrl + sep + "series=" + encodeURIComponent(symbol);
   try {
-    const data = await fetchJSONP(url);
+    const data = await fetchJSON(url);
     const points = (data.series || []).filter(p => p.price > 0);
     const n = pointsForRange(range);
     const sliced = points.slice(-n);
