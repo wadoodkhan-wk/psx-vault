@@ -272,6 +272,7 @@
       <span><span class="status-dot off" id="liveDot"></span><span id="liveText">not connected</span></span>
       <button id="refreshBtn">Refresh</button>
     </div>
+    <div id="liveDebug" style="display:none; font-size:11px; color:var(--amber); font-family:'IBM Plex Mono',monospace; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:12px; word-break:break-word;"></div>
     <input type="text" class="search-box" id="watchSearch" placeholder="Search companies by symbol or name...">
     <div id="watchlist"><div class="empty">No data yet — open Settings (top right) to connect a data source.</div></div>
   </div>
@@ -556,12 +557,20 @@ function fetchJSONP(url) {
 // the older JSONP <script>-tag technique). JSONP is kept only as a fallback
 // for the rare case fetch itself is blocked (e.g. a restrictive network).
 async function fetchJSON(url) {
+  let fetchErr = null;
   try {
     const res = await fetch(url, { method: "GET", mode: "cors" });
-    if (!res.ok) throw new Error("bad status " + res.status);
+    if (!res.ok) throw new Error("HTTP " + res.status);
     return await res.json();
   } catch (e) {
-    return fetchJSONP(url);
+    fetchErr = (e && e.message) || String(e);
+  }
+  try {
+    return await fetchJSONP(url);
+  } catch (e2) {
+    const jsonpErr = (e2 && e2.message) || String(e2);
+    const err = new Error(`fetch() failed: ${fetchErr} — JSONP fallback also failed: ${jsonpErr}`);
+    throw err;
   }
 }
 
@@ -572,13 +581,20 @@ async function fetchData() {
     render(data);
     setLive(true);
   } catch (e) {
-    setLive(false);
+    setLive(false, (e && e.message) || String(e));
   }
 }
 
-function setLive(ok) {
+function setLive(ok, errorDetail) {
   document.getElementById("liveDot").className = "status-dot " + (ok ? "live" : "off");
   document.getElementById("liveText").textContent = ok ? "live" : "connection failed";
+  const debugEl = document.getElementById("liveDebug");
+  if (ok || !errorDetail) {
+    debugEl.style.display = "none";
+  } else {
+    debugEl.textContent = errorDetail;
+    debugEl.style.display = "block";
+  }
 }
 
 // ---- background animation (real data only, no simulated numbers) ----
